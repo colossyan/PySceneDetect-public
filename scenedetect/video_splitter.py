@@ -39,6 +39,8 @@ import time
 import typing as ty
 from dataclasses import dataclass
 from pathlib import Path
+import re
+
 
 from scenedetect.common import FrameTimecode, TimecodePair
 from scenedetect.platform import CommandTooLong, Template, get_ffmpeg_path, invoke_command, tqdm
@@ -245,13 +247,13 @@ def split_video_mkvmerge(
         logger.error("Error splitting video (mkvmerge returned %d).", ret_val)
     return ret_val
 
-
 def split_video_ffmpeg(
     input_video_path: str,
     scene_list: ty.Iterable[TimecodePair],
     output_dir: ty.Optional[Path] = None,
     output_file_template: str = "$VIDEO_NAME-Scene-$SCENE_NUMBER.mp4",
     video_name: ty.Optional[str] = None,
+    output_fps:int = 25,
     arg_override: str = DEFAULT_FFMPEG_ARGS,
     show_progress: bool = False,
     show_output: bool = False,
@@ -332,6 +334,11 @@ def split_video_ffmpeg(
             if output_dir:
                 output_path = Path(output_dir) / output_path
             output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path = re.sub(
+                r"(P\d+)-S(\d+)-F(\d+)-F(\d+)-FPS(\d+)",
+                r"\1_S\2_F\3_F\4_FPS\5",
+                str(output_path),
+            )
 
             # Gracefully handle case where FFMPEG_PATH might be unset.
             call_list = [FFMPEG_PATH if FFMPEG_PATH is not None else "ffmpeg"]
@@ -351,6 +358,8 @@ def split_video_ffmpeg(
                 input_video_path,
                 "-t",
                 str(duration.get_seconds()),
+                "-r",
+                str(output_fps)
             ]
             call_list += arg_override
             call_list += ["-sn"]
